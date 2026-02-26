@@ -1,0 +1,22 @@
+{
+  "name": "pamertass-website",
+  "version": "1.0.0",
+  "description": "Website PAMERTASS PMR SMAN 17 Surabaya",
+  "main": "index.js",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "keywords": ["pmr", "pamertass", "surabaya"],
+  "author": "PAMERTASS PMR SMAN 17 Surabaya",
+  "license": "MIT"
+}
