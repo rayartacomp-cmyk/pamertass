@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi QR - PAMERTASS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .scanner-container {
+            background: #000;
+            border-radius: 20px;
+            padding: 20px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+        #qr-reader {
+            width: 100%;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .btn-scan {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        .history-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .badge-hadir {
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .badge-izin {
+            background: #ffc107;
+            color: #333;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .badge-sakit {
+            background: #17a2b8;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .btn-back {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 10px;
+            width: 100%;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card p-4">
+            <h3 class="text-center mb-4">Absensi QR Code</h3>
+            
+            <!-- QR Scanner -->
+            <div class="scanner-container mb-3">
+                <div id="qr-reader" style="width: 100%"></div>
+                <div id="qr-reader-results" style="display: none;"></div>
+            </div>
+            
+            <button class="btn-scan" onclick="startScanner()">
+                <i class="fas fa-camera me-2"></i>Mulai Scan
+            </button>
+            
+            <p class="text-center text-muted small mb-4">
+                Arahkan kamera ke QR Code yang disediakan admin
+            </p>
+            
+            <!-- Status Absensi Hari Ini -->
+            <div class="alert alert-info" id="todayStatus">
+                Memuat status absensi...
+            </div>
+        </div>
+        
+        <!-- Riwayat Absensi -->
+        <div class="card p-4">
+            <h5 class="mb-3">Riwayat Absensi</h5>
+            <div id="attendanceHistory">
+                <p class="text-muted text-center">Memuat riwayat...</p>
+            </div>
+        </div>
+        
+        <a href="dashboard.html" class="btn-back">Kembali ke Dashboard</a>
+    </div>
+    
+    <!-- Library untuk QR Scanner -->
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-kit-code.js" crossorigin="anonymous"></script>
+    
+    <script>
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+        
+        let html5QrcodeScanner = null;
+        
+        function startScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.clear();
+            }
+            
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader", 
+                { fps: 10, qrbox: 250 },
+                /* verbose= */ false
+            );
+            
+            html5QrcodeScanner.render(onScanSuccess, onScanError);
+        }
+        
+        function onScanSuccess(decodedText, decodedResult) {
+            // Handle scan success
+            html5QrcodeScanner.clear();
+            
+            // Parse QR code data (format: "ABSEN:{user_id}:{date}")
+            const qrData = decodedText;
+            
+            // Kirim absensi
+            submitAttendance(qrData);
+        }
+        
+        function onScanError(errorMessage) {
+            // Handle scan error (bisa diabaikan)
+            console.log(errorMessage);
+        }
+        
+        async function submitAttendance(qrData) {
+            try {
+                const response = await fetch('/.netlify/functions/attendance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        qrCode: qrData,
+                        status: 'hadir'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    alert('Gagal absensi: ' + (data.error || 'Unknown error'));
+                    startScanner();
+                    return;
+                }
+                
+                alert('Absensi berhasil! Terima kasih.');
+                loadAttendanceHistory();
+                
+            } catch (error) {
+                alert('Network error. Silakan coba lagi.');
+                startScanner();
+            }
+        }
+        
+        async function loadAttendanceHistory() {
+            try {
+                const response = await fetch('/.netlify/functions/attendance/user', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const attendance = await response.json();
+                
+                // Status hari ini
+                const today = new Date().toISOString().split('T')[0];
+                const todayAttendance = attendance.find(a => a.date === today);
+                
+                const todayStatus = document.getElementById('todayStatus');
+                if (todayAttendance) {
+                    const statusClass = todayAttendance.status === 'hadir' ? 'success' : 'warning';
+                    todayStatus.innerHTML = `
+                        <strong>Status Hari Ini:</strong> 
+                        <span class="badge-${statusClass}">${todayAttendance.status.toUpperCase()}</span>
+                        <br>
+                        <small>Waktu: ${todayAttendance.check_in_time || '-'}</small>
+                    `;
+                } else {
+                    todayStatus.innerHTML = '<strong>Status Hari Ini:</strong> Belum absen';
+                }
+                
+                // Riwayat 10 terakhir
+                const historyDiv = document.getElementById('attendanceHistory');
+                if (attendance.length > 0) {
+                    historyDiv.innerHTML = attendance.slice(0, 10).map(a => `
+                        <div class="history-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>${new Date(a.date).toLocaleDateString('id-ID')}</strong>
+                                    <br>
+                                    <small>${a.check_in_time || '-'}</small>
+                                </div>
+                                <div>
+                                    <span class="badge-${a.status}">${a.status}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    historyDiv.innerHTML = '<p class="text-muted text-center">Belum ada riwayat absensi</p>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+        
+        // Load riwayat saat halaman dibuka
+        loadAttendanceHistory();
+    </script>
+</body>
+</html>

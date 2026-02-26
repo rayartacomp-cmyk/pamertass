@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Dashboard - PAMERTASS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            border-radius: 20px;
+            border: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .welcome-header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .menu-item {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="welcome-header">
+            <h2>Selamat Datang, <span id="memberName">Anggota</span>!</h2>
+            <p>PMR SMAN 17 Surabaya</p>
+        </div>
+
+        <div class="menu-grid">
+            <a href="profile.html" class="menu-item">
+                <i class="fas fa-user fa-2x mb-2"></i>
+                <h5>Profil Saya</h5>
+            </a>
+            <a href="attendance.html" class="menu-item">
+                <i class="fas fa-qrcode fa-2x mb-2"></i>
+                <h5>Absensi QR</h5>
+            </a>
+            <a href="schedule.html" class="menu-item">
+                <i class="fas fa-calendar fa-2x mb-2"></i>
+                <h5>Jadwal</h5>
+            </a>
+            <a href="events.html" class="menu-item">
+                <i class="fas fa-calendar-alt fa-2x mb-2"></i>
+                <h5>Event</h5>
+            </a>
+        </div>
+
+        <div class="card p-4 mt-3">
+                    <div class="card p-4 mt-3">
+            <h5>Jadwal Hari Ini</h5>
+            <div id="todaySchedule">
+                <p class="text-muted">Memuat jadwal...</p>
+            </div>
+        </div>
+
+        <div class="card p-4 mt-3">
+            <h5>Event Mendatang</h5>
+            <div id="upcomingEvents">
+                <p class="text-muted">Memuat event...</p>
+            </div>
+        </div>
+
+        <div class="card p-4 mt-3 text-center">
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script src="https://kit.fontawesome.com/your-kit-code.js" crossorigin="anonymous"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Tampilkan nama member
+        document.getElementById('memberName').textContent = user.full_name || user.username;
+
+        async function loadDashboard() {
+            try {
+                // Load jadwal hari ini
+                const today = new Date().toISOString().split('T')[0];
+                const scheduleRes = await fetch(`/.netlify/functions/schedules?date=${today}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const schedules = await scheduleRes.json();
+                
+                const scheduleDiv = document.getElementById('todaySchedule');
+                if (schedules.length > 0) {
+                    scheduleDiv.innerHTML = schedules.map(s => `
+                        <div class="border-bottom pb-2 mb-2">
+                            <strong>${s.title}</strong><br>
+                            <small>${s.start_time} - ${s.end_time} | ${s.location}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    scheduleDiv.innerHTML = '<p class="text-muted">Tidak ada jadwal hari ini</p>';
+                }
+
+                // Load event mendatang
+                const eventRes = await fetch('/.netlify/functions/events?status=upcoming', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const events = await eventRes.json();
+                
+                const eventDiv = document.getElementById('upcomingEvents');
+                if (events.length > 0) {
+                    eventDiv.innerHTML = events.slice(0, 3).map(e => `
+                        <div class="border-bottom pb-2 mb-2">
+                            <strong>${e.title}</strong><br>
+                            <small>${new Date(e.start_date).toLocaleDateString('id-ID')} | ${e.location}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    eventDiv.innerHTML = '<p class="text-muted">Tidak ada event mendatang</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        }
+
+        loadDashboard();
+    </script>
+</body>
+</html>
